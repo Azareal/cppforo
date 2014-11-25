@@ -11,6 +11,8 @@ Python 3.4
 
 Windows (Linux is coming very soon!)
 
+MySQL Client
+
 Building
 =====
 Windows: Build instructions coming soon!
