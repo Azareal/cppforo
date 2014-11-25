@@ -14,5 +14,6 @@ Windows (Linux is coming very soon!)
 
 Building from source
 =====
-Building from source additionally requires the MySQL Connector/C++ driver to be installed on the build machine.
+Building from source additionally requires the MySQL Connector/C++ driver and the Boost Library to be installed on the build machine.
+
 Windows: Build instructions coming soon!
