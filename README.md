@@ -11,8 +11,8 @@ Python 3.4
 
 Windows (Linux is coming very soon!)
 
-MySQL Client
 
-Building
+Building from source
 =====
+Building from source additionally requires the MySQL Connector/C++ driver to be installed on the build machine.
 Windows: Build instructions coming soon!
