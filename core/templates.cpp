@@ -66,7 +66,7 @@ std::string Templates::render(std::string name)
 {
 	std::string tmpl = getTemplate(name);
 	
-	/*tmpl = boost::regex_replace(tmpl, varRegex, [this](boost::smatch match){
+	tmpl = boost::regex_replace(tmpl, varRegex, [this](boost::smatch match){
 		std::string var = match.str(0) + match.str(1);
 		std::string buffer;
 		std::string out;
@@ -95,8 +95,9 @@ std::string Templates::render(std::string name)
 			}
 		}
 		return out;
-	});*/
+	});
 
+	// Old code.. This is going out the window..
 	/*std::sregex_iterator it(tmpl.begin(), tmpl.end(), varRegex);
 	std::sregex_iterator it_end;
 	while (it != it_end) {
