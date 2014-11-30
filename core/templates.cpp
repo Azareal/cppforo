@@ -1,8 +1,24 @@
 #include "stdafx.h"
 #include "templates.h"
 
-std::string regexString = "\\{$[a-zA-Z_-][a-zA-Z1-9_-]+\\}";
+std::string regexString = "\\{\\$[a-zA-Z_-][a-zA-Z1-9_-]+\\}";
 boost::regex varRegex(regexString);
+
+TemplateNode::TemplateNode(std::string name, TemplateNode * node)
+{
+	childNodes[name] = node;
+}
+
+TemplateNode::TemplateNode(std::string * data)
+{
+	body = *data;
+}
+
+TemplateNode::TemplateNode(char * data)
+{
+	std::string temp(data);
+	body = temp;
+}
 
 //Templates::Templates(sql::Connection * _con)
 Templates::Templates(Database * _db)
@@ -23,7 +39,7 @@ bool Templates::loadTemplate(std::string name)
 {
 	std::string tmpl;
 
-	std::ifstream in(name, std::ios::in | std::ios::binary);
+	std::ifstream in("../templates/" + name + ".html", std::ios::in | std::ios::binary);
 	if(in)
 	{
 		in.seekg(0, std::ios::end);
@@ -67,12 +83,12 @@ std::string Templates::render(std::string name)
 	std::string tmpl = getTemplate(name);
 	
 	tmpl = boost::regex_replace(tmpl, varRegex, [this](boost::smatch match){
-		std::string var = match.str(0) + match.str(1);
+		std::string var = match.str();
 		std::string buffer;
 		std::string out;
 		TemplateNode * lastNode = nullptr;
 
-		for (std::string::iterator it = var.begin(); it != var.end(); ++it) {
+		for (std::string::iterator it = var.begin() + 2; it != (var.end() - 1); ++it) {
 			char c = *it;
 			buffer += c;
 			if (c == '.')
@@ -85,6 +101,7 @@ std::string Templates::render(std::string name)
 				else if(lastNode->childNodes[buffer]==nullptr)
 				{
 					out = lastNode->body;
+					buffer = "";
 					break;
 				}
 				else
@@ -94,6 +111,8 @@ std::string Templates::render(std::string name)
 				}
 			}
 		}
+		if (buffer.compare("") != 0) out = tmplmap[buffer]->body;
+		
 		return out;
 	});
 
@@ -108,3 +127,7 @@ std::string Templates::render(std::string name)
 	return tmpl;
 }
 
+void Templates::assignVar(std::string name, std::string content)
+{
+	tmplmap[name] = new TemplateNode(&content);
+}

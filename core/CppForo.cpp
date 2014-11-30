@@ -6,6 +6,8 @@
 #include <iostream>
 #include <sstream>
 #include <map>
+#include <chrono>
+#include <thread>
 #include "templates.h"
 //#include "server_http_thread_pool.h"
 
@@ -41,9 +43,13 @@ class forum_server : public dlib::server_http
 	const std::string on_request(const dlib::incoming_things& incoming, dlib::outgoing_things& outgoing)
 	{
 		std::ostringstream out;
+		log("Received new request!");
 
-		out << "Hello World";
+		tmpls->assignVar("helloworld","Hello World");
+		std::string page = tmpls->render("page");
+		out << page;
 
+		log("Responding to the request!");
 		return out.str();
 	}
 };
@@ -161,6 +167,12 @@ int main(int argc, char * argv[])
 	forum_server fserver;
 	fserver.set_listening_port(atoi(port.c_str()));
 	fserver.start_async();
+
+	/*bool shutdown = false;
+	while (!shutdown)
+	{
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}*/
 
 	// Stop the console from exitting immediately..
 	log("Press enter to exit..");

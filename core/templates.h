@@ -20,7 +20,7 @@ public:
 	std::map<std::string, TemplateNode*> childNodes;
 	std::string body;
 
-	TemplateNode(TemplateNode * node);
+	TemplateNode(std::string name, TemplateNode * node);
 	TemplateNode(std::string * data);
 	TemplateNode(char * data);
 };
@@ -38,5 +38,6 @@ public:
 	bool loadTemplate(std::string name);
 	std::string getTemplate(std::string name);
 	std::string render(std::string name);
+	void assignVar(std::string name, std::string content);
 	void build(std::string);
 };
