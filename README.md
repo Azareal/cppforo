@@ -2,7 +2,7 @@ cppforo
 =======
 
 Cpp Foro: Forum software powered by C++
-The code should be up within a week :)
+The project files and the complete build instructions should be up within a week :)
 
 
 Requirements
