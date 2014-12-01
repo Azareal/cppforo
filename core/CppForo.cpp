@@ -8,6 +8,7 @@
 #include <map>
 #include <chrono>
 #include <thread>
+#include <functional>
 #include "templates.h"
 //#include "server_http_thread_pool.h"
 
@@ -30,6 +31,9 @@ Templates * tmpls;
 
 // The settings..
 std::map<std::string, std::string> settings;
+typedef std::function<std::string(std::string, dlib::incoming_things, dlib::outgoing_things)> Route;
+typedef std::map<std::string, Route> RouteMap;
+RouteMap routes;
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -43,16 +47,39 @@ class forum_server : public dlib::server_http
 	const std::string on_request(const dlib::incoming_things& incoming, dlib::outgoing_things& outgoing)
 	{
 		std::ostringstream out;
-		log("Received new request!");
+		std::string path = incoming.path;
+		log("Received new request from '" + incoming.foreign_ip + "' who is trying to access '" + path + "'");
+		std::string route;
 
-		tmpls->assignVar("helloworld","Hello World");
-		std::string page = tmpls->render("page");
-		out << page;
+		if (path.size() != 1)
+		{
+			std::string::iterator it;
+			for (it = path.begin() + 1; it != path.end(); ++it)
+			{
+				if (*it == '/') break;
+			}
+			int index = std::distance(path.begin(), it);
+			try{
+				out << routes[path.substr(0, index)](path.substr(index), incoming, outgoing);
+			}
+			catch (std::exception& e)
+			{
+				error(e.what());
+				return "500 Internal Server Error";
+			}
+		}
+		// Home is the default route..
+		else out << routes["home"]("",incoming, outgoing);
 
 		log("Responding to the request!");
 		return out.str();
 	}
 };
+
+void addRoute(std::string name, Route route)
+{
+	routes[name] = route;
+}
 
 void loadSettings()
 {
@@ -129,7 +156,6 @@ int main(int argc, char * argv[])
 		return 1;
 	}
 
-	
 	log("Switching to the correct database..");
 	sql::Statement * stmt;
 	stmt = con->createStatement();
@@ -162,6 +188,13 @@ int main(int argc, char * argv[])
 	if (!tmpls->loadTemplate("header")) { error("Failed to load the header template.."); return 1; }
 	if (!tmpls->loadTemplate("footer")) { error("Failed to load the footer template.."); return 1; }
 	if (!tmpls->loadTemplate("page")) { error("Failed to load the page template.."); return 1; }
+
+	log("Registering the routes..");
+	addRoute("home", [](std::string path, dlib::incoming_things& incoming, dlib::outgoing_things& outgoing){
+		tmpls->assignVar("helloworld", "Hello World");
+		std::string page = tmpls->render("page");
+		return page;
+	});
 
 	log("Initializing the forum server..");
 	forum_server fserver;
