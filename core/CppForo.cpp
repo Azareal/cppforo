@@ -10,6 +10,7 @@
 #include <thread>
 #include <functional>
 #include "templates.h"
+#include "forum.h"
 //#include "server_http_thread_pool.h"
 
 //#include <boost/network/protocol/http/server.hpp>
@@ -26,7 +27,7 @@
 // The database globals..
 sql::mysql::MySQL_Driver * driver;
 sql::Connection * con;
-Database * db;
+ForoDatabase * db;
 Templates * tmpls;
 
 // The settings..
@@ -34,6 +35,7 @@ std::map<std::string, std::string> settings;
 typedef std::function<std::string(std::string, dlib::incoming_things, dlib::outgoing_things)> Route;
 typedef std::map<std::string, Route> RouteMap;
 RouteMap routes;
+std::map<int, Forum> forums;
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -181,9 +183,15 @@ int main(int argc, char * argv[])
 		error("Exception: " + errmsg);
 		return 1;
 	}
+	
+	log("Moving the database handling into the database object..");
+	db = new ForoDatabase(con, pt.get<std::string>("mysql.prefix"));
+	Forum::prepare();
+
+	log("Loading the forums..");
+	forums = getAllForums();
 
 	log("Loading the templates..");
-	db = new Database(con, pt.get<std::string>("mysql.prefix"));
 	tmpls = new Templates(db);
 	if (!tmpls->loadTemplate("header")) { error("Failed to load the header template.."); return 1; }
 	if (!tmpls->loadTemplate("footer")) { error("Failed to load the footer template.."); return 1; }

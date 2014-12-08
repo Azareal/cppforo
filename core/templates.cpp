@@ -21,7 +21,7 @@ TemplateNode::TemplateNode(char * data)
 }
 
 //Templates::Templates(sql::Connection * _con)
-Templates::Templates(Database * _db)
+Templates::Templates(ForoDatabase * _db)
 {
 	db = _db;
 
