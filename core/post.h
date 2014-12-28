@@ -1,3 +1,8 @@
+/*
+	Copyright (c) Azareal 2014.
+	Licensed under the LGPL v3.
+*/
+
 #include <string>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
@@ -8,6 +13,7 @@
 #include <cppconn/prepared_statement.h>
 #include "database.h"
 #include "exceptions.h"
+#include "topic.h"
 #pragma once
 
 extern ForoDatabase * db;
@@ -17,6 +23,7 @@ class Post
 	//static sql::PreparedStatement * updateStatement;
 	
 	int pid;
+	int tid;
 	std::string content;
 	int author = 0;
 	bool is_locked = false;
@@ -26,6 +33,9 @@ public:
 
 	Post(int _pid);
 	int getID();
+
+	int getTID();
+	bool setTID(int _tid);
 	std::string getContent();
 	bool setContent(std::string _content);
 	int getAuthor();
@@ -33,4 +43,6 @@ public:
 	bool is(std::string name);
 	bool Post::lock(bool state);
 	bool Post::stick(bool state);
+
+	Topic getParentTopic();
 };

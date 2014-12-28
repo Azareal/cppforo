@@ -1,3 +1,8 @@
+/*
+Copyright (c) Azareal 2014.
+Licensed under the LGPL v3.
+*/
+
 #include <mysql_driver.h>
 #include <mysql_connection.h>
 #include <mysql_error.h>

@@ -1,3 +1,8 @@
+/*
+Copyright (c) Azareal 2014.
+Licensed under the LGPL v3.
+*/
+
 #include "stdafx.h"
 #include "templates.h"
 
@@ -98,7 +103,7 @@ std::string Templates::render(std::string name)
 					lastNode = tmplmap[buffer];
 					buffer = "";
 				}
-				else if(lastNode->childNodes[buffer]==nullptr)
+				else if (lastNode->childNodes[buffer] == nullptr)
 				{
 					out = lastNode->body;
 					buffer = "";
@@ -111,8 +116,12 @@ std::string Templates::render(std::string name)
 				}
 			}
 		}
+
+		// Does this template variable exist..?
+		if (tmplmap.count(buffer) == 0) return var;
+
 		if (buffer.compare("") != 0) out = tmplmap[buffer]->body;
-		
+
 		return out;
 	});
 

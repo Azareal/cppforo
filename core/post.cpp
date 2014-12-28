@@ -1,9 +1,16 @@
+/*
+Copyright (c) Azareal 2014.
+Licensed under the LGPL v3.
+*/
+
 #include "stdafx.h"
 #include "post.h"
 
 sql::PreparedStatement * postGetStatement;
-sql::PreparedStatement * postUpdateStatement;
-ebadField badField;
+sql::PreparedStatement * postGetParentTopicStatement;
+sql::PreparedStatement * postContentUpdateStatement;
+sql::PreparedStatement * postTIDUpdateStatement;
+sql::PreparedStatement * postAuthorUpdateStatement;
 ebadPost badPost;
 
 void Post::prepare()
@@ -11,7 +18,11 @@ void Post::prepare()
 	try
 	{
 		postGetStatement = db->con->prepareStatement("SELECT * FROM " + db->prefix + "posts WHERE pid = ? LIMIT 1");
-		postUpdateStatement = db->con->prepareStatement("UPDATE " + db->prefix + "posts SET ? = ? WHERE pid = ? LIMIT 1");
+		//postUpdateStatement = db->con->prepareStatement("UPDATE " + db->prefix + "posts SET ? = ? WHERE pid = ? LIMIT 1");
+		postContentUpdateStatement = db->con->prepareStatement("UPDATE " + db->prefix + "posts SET content = ? WHERE pid = ? LIMIT 1");
+		postTIDUpdateStatement = db->con->prepareStatement("UPDATE " + db->prefix + "posts SET tid = ? WHERE pid = ? LIMIT 1");
+		postAuthorUpdateStatement = db->con->prepareStatement("UPDATE " + db->prefix + "posts SET author = ? WHERE pid = ? LIMIT 1");
+		postGetParentTopicStatement = db->con->prepareStatement("SELECT * FROM " + db->prefix + "topics WHERE tid = ? LIMIT 1");
 	}
 	catch (std::exception& e)
 	{
@@ -33,13 +44,10 @@ Post::Post(int _pid)
 
 	// Loop over the retrieved item..
 	pid = _pid;
-	while (res->next())
-	{
-		content = res->getString("content");
-		author = res->getInt("author");
-		is_locked = res->getBoolean("is_locked");
-		is_sticky = res->getBoolean("is_sticky");
-	}
+	res->next();
+	content = res->getString("content");
+	author = res->getInt("author");
+	tid = res->getInt("tid");
 
 	delete res;
 }
@@ -47,6 +55,30 @@ Post::Post(int _pid)
 int Post::getID()
 {
 	return pid;
+}
+
+int Post::getTID()
+{
+	return tid;
+}
+
+bool Post::setTID(int _tid)
+{
+	tid = _tid;
+
+	try
+	{
+		//postUpdateStatement->setString(1, "content");
+		postTIDUpdateStatement->setInt(1, _tid);
+		postTIDUpdateStatement->setInt(2, pid);
+		postTIDUpdateStatement->execute();
+	}
+	catch (std::exception& e)
+	{
+		log(e.what());
+		return false;
+	}
+	return true;
 }
 
 std::string Post::getContent()
@@ -60,10 +92,9 @@ bool Post::setContent(std::string _content)
 
 	try
 	{
-		postUpdateStatement->setString(1, "content");
-		postUpdateStatement->setString(2, _content);
-		postUpdateStatement->setInt(3, pid);
-		postUpdateStatement->execute();
+		postContentUpdateStatement->setString(1, _content);
+		postContentUpdateStatement->setInt(2, pid);
+		postContentUpdateStatement->execute();
 	}
 	catch (std::exception& e)
 	{
@@ -84,10 +115,9 @@ bool Post::setAuthor(int _author)
 
 	try
 	{
-		postUpdateStatement->setString(1, "author");
-		postUpdateStatement->setInt(2, _author);
-		postUpdateStatement->setInt(3, pid);
-		postUpdateStatement->execute();
+		postAuthorUpdateStatement->setInt(1, _author);
+		postAuthorUpdateStatement->setInt(2, pid);
+		postAuthorUpdateStatement->execute();
 	}
 	catch (std::exception& e)
 	{
@@ -97,48 +127,10 @@ bool Post::setAuthor(int _author)
 	return true;
 }
 
-bool Post::is(std::string name)
+ebadTopic badTopic;
+Topic Post::getParentTopic()
 {
-	if (name.compare("is_locked")) return is_locked;
-	if (name.compare("is_sticky")) return is_sticky;
-	throw badField;
-	return false;
-}
-
-bool Post::lock(bool state)
-{
-	is_locked = state;
-
-	try
-	{
-		postUpdateStatement->setString(1, "is_locked");
-		postUpdateStatement->setBoolean(2, state);
-		postUpdateStatement->setInt(3, pid);
-		postUpdateStatement->execute();
-	}
-	catch (std::exception& e)
-	{
-		log(e.what());
-		return false;
-	}
-	return true;
-}
-
-bool Post::stick(bool state)
-{
-	is_sticky = state;
-
-	try
-	{
-		postUpdateStatement->setString(1, "is_sticky");
-		postUpdateStatement->setBoolean(2, state);
-		postUpdateStatement->setInt(3, pid);
-		postUpdateStatement->execute();
-	}
-	catch (std::exception& e)
-	{
-		log(e.what());
-		return false;
-	}
-	return true;
+	log(std::to_string(tid));
+	Topic parentTopic(tid);
+	return parentTopic;
 }

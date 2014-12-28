@@ -1,3 +1,8 @@
+/*
+Copyright (c) Azareal 2014.
+Licensed under the LGPL v3.
+*/
+
 #include "stdafx.h"
 #include "database.h"
 

@@ -1,3 +1,8 @@
+/*
+Copyright (c) Azareal 2014.
+Licensed under the LGPL v3.
+*/
+
 #include "stdafx.h"
 #include "logger.h"
 
@@ -6,6 +11,11 @@ void log(std::string str)
 {
 	std::cout << str << std::endl;
 }
+
+/*void log(char * str)
+{
+	std::cout << str << std::endl;
+}*/
 
 void error(std::string str)
 {
@@ -19,7 +29,7 @@ void error(std::string str)
 
 void error(char * str)
 {
-	std::cerr << str << std::endl;
+	std::cerr << std::string(str) << std::endl;
 
 	// Stop the console from exitting immediately..
 	log("Press enter to exit..");

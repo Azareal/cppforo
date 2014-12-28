@@ -1,8 +1,12 @@
-// CppForo.cpp : Defines the entry point for the console application.
-//
+/*
+	CppForo Main Entrypoint
+	Copyright (c) Azareal 2014.
+	Licensed under the LGPLv3.
+*/
 
 #include "stdafx.h"
 #include <string>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <map>
@@ -11,14 +15,19 @@
 #include <functional>
 #include "templates.h"
 #include "forum.h"
+#include "topic.h"
+#include "user.h"
+#include "parse.h"
 //#include "server_http_thread_pool.h"
 
 //#include <boost/network/protocol/http/server.hpp>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
 #include <mysql_error.h>
-#include <cppconn/statement.h>
+#include <cppconn/exception.h>
 #include <cppconn/resultset.h>
+#include <cppconn/statement.h>
+#include <cppconn/prepared_statement.h>
 
 #define ENABLE_ASSERTS
 #include <dlib/all/source.cpp>
@@ -32,13 +41,14 @@ Templates * tmpls;
 
 // The settings..
 std::map<std::string, std::string> settings;
-typedef std::function<std::string(std::string, dlib::incoming_things, dlib::outgoing_things)> Route;
+typedef std::function<std::string(std::string, dlib::incoming_things, dlib::outgoing_things&)> Route;
 typedef std::map<std::string, Route> RouteMap;
 RouteMap routes;
 std::map<int, Forum> forums;
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/lexical_cast.hpp>
 
 // The main configuration file variable..
 boost::property_tree::ptree pt;
@@ -48,7 +58,6 @@ class forum_server : public dlib::server_http
 {
 	const std::string on_request(const dlib::incoming_things& incoming, dlib::outgoing_things& outgoing)
 	{
-		std::ostringstream out;
 		std::string path = incoming.path;
 		log("Received new request from '" + incoming.foreign_ip + "' who is trying to access '" + path + "'");
 		std::string route;
@@ -60,9 +69,10 @@ class forum_server : public dlib::server_http
 			{
 				if (*it == '/') break;
 			}
-			int index = std::distance(path.begin(), it);
+			int index = std::distance(path.begin() + 1, it);
 			try{
-				out << routes[path.substr(0, index)](path.substr(index), incoming, outgoing);
+				//out << routes[path.substr(1, index)](path.substr(index + 2), incoming, outgoing);
+				return routes[path.substr(1, index)](path.substr(index + 2), incoming, outgoing);
 			}
 			catch (std::exception& e)
 			{
@@ -71,10 +81,7 @@ class forum_server : public dlib::server_http
 			}
 		}
 		// Home is the default route..
-		else out << routes["home"]("",incoming, outgoing);
-
-		log("Responding to the request!");
-		return out.str();
+		else return routes["home"]("",incoming, outgoing);
 	}
 };
 
@@ -98,6 +105,57 @@ void loadSettings()
 
 	delete res;
 	delete stmt;
+}
+
+// The prepared statements..
+// TO-DO: Stop storing these as globals..
+sql::PreparedStatement * getSessionStmt;
+sql::PreparedStatement * getTopicStmt;
+sql::PreparedStatement * createReplyStmt;
+
+User checkSession(dlib::incoming_things& incoming)
+{
+	int uid = 0;
+	std::string session = "";
+
+	try{
+		uid = std::stoi(incoming.cookies["uid"]);
+		session = incoming.cookies["session"];
+	}
+	catch (...)
+	{
+		//log("It's a guest!");
+		return guest();
+	}
+
+	if (uid != 0 && session.compare("")!=0)
+	{
+		//log("The session isn't blank");
+
+		sql::ResultSet * res;
+		getSessionStmt->setString(1, session);
+		res = getSessionStmt->executeQuery();
+
+		if (res->rowsCount() == 0)
+		{
+			// TO-DO: Might have to add a more detailed logging level to avoid the admin console from being flooded..
+			//log("It's a guest!");
+			return guest();
+		}
+
+		User out;
+		out.uid = res->getInt("uid");
+		out.username = res->getString("username");
+		out.gid = res->getInt("gid");
+		out.is_admin = res->getBoolean("is_admin");
+		out.is_mod = res->getBoolean("is_mod");
+		out.is_banned = res->getBoolean("is_banned");
+
+		delete res;
+		return out;
+	}
+
+	return guest();
 }
 
 // The main entrypoint..
@@ -186,7 +244,23 @@ int main(int argc, char * argv[])
 	
 	log("Moving the database handling into the database object..");
 	db = new ForoDatabase(con, pt.get<std::string>("mysql.prefix"));
+
+	log("Prepare the prepared statements..");
 	Forum::prepare();
+	User::prepare();
+	Topic::prepare();
+	Post::prepare();
+
+	try
+	{
+		getSessionStmt = db->con->prepareStatement("SELECT * FROM " + db->prefix + "users WHERE session = ? LIMIT 1");
+		getTopicStmt = db->con->prepareStatement("SELECT * FROM " + db->prefix + "topics AS topics LEFT JOIN " + db->prefix + "forums AS forums ON topics.fid=forums.fid WHERE tid = ? LIMIT 1");
+		createReplyStmt = db->con->prepareStatement("INSERT INTO " + db->prefix + "posts (content, author, tid) VALUES (?, ?, ?)");
+	}
+	catch (std::exception& e)
+	{
+		error(e.what());
+	}
 
 	log("Loading the forums..");
 	forums = getAllForums();
@@ -197,11 +271,332 @@ int main(int argc, char * argv[])
 	if (!tmpls->loadTemplate("footer")) { error("Failed to load the footer template.."); return 1; }
 	if (!tmpls->loadTemplate("page")) { error("Failed to load the page template.."); return 1; }
 
+	if (!tmpls->loadTemplate("category")) { error("Failed to load the category template.."); return 1; }
+	if (!tmpls->loadTemplate("forum_row")) { error("Failed to load the forum_row template.."); return 1; }
+
+	if (!tmpls->loadTemplate("topic")) { error("Failed to load the topic template.."); return 1; }
+	if (!tmpls->loadTemplate("post")) { error("Failed to load the post template.."); return 1; }
+
+	log("Caching some of the very frequently used settings..");
+	tmpls->assignVar("site_url", settings["site_url"]);
+	tmpls->assignVar("site_name", settings["site_name"]);
+
 	log("Registering the routes..");
-	addRoute("home", [](std::string path, dlib::incoming_things& incoming, dlib::outgoing_things& outgoing){
-		tmpls->assignVar("helloworld", "Hello World");
-		std::string page = tmpls->render("page");
-		return page;
+	addRoute("home", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		User currentUser = checkSession(incoming);
+
+		//tmpls->assignVar("helloworld", "Hello World");
+		if (!currentUser.loggedIn() && settings["members_only"].compare("1")==0)
+		{
+			log("Non-members aren't allowed on a members only site.");
+			return ""; // TO-DO: Return a 403.
+		}
+		if (currentUser.is_banned)
+		{
+			log("It appears to be a banned user!");
+			return tmpls->render("banned");
+		}
+		
+		std::string forumList;
+		User lastposter;
+		for (auto it = forums.begin(); it != forums.end(); ++it)
+		{
+			if (it->second.getAdminOnly() && !currentUser.is_admin) continue;
+			if (it->second.getStaffOnly() && !currentUser.is_mod) continue;
+
+			tmpls->assignVar("fid", std::to_string(it->second.getID()));
+			tmpls->assignVar("forum_name", it->second.getName());
+
+			// If the lastposter doesn't exist then, the account may have been deleted.
+			try
+			{
+				User lastposter(it->second.getLastPoster());
+			}
+			catch (...) { lastposter = guest(); }
+			tmpls->assignVar("lastposter_name", lastposter.getName());
+
+			Post lastpost(it->second.getLastPost());
+			// TO-DO: Use a join here for extra performance instead of two queries
+			Topic lastTopic = lastpost.getParentTopic();
+			tmpls->assignVar("lastpost_name", lastTopic.getName());
+			tmpls->assignVar("lastpost_tid", std::to_string(lastTopic.getID()));
+
+			forumList += tmpls->render("forum_row");
+		}
+		
+		tmpls->assignVar("forum_list", forumList);
+		tmpls->assignVar("catname","Forum List");
+		tmpls->assignVar("body", tmpls->render("category"));
+
+		log("Pushing out the page..");
+		tmpls->assignVar("header", tmpls->render("header"));
+		tmpls->assignVar("footer", tmpls->render("footer"));
+		return tmpls->render("page");
+	});
+	addRoute("topics", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		//log("Entering topic '" + path + "'");
+		User currentUser = checkSession(incoming);
+		if (!currentUser.loggedIn() && settings["members_only"].compare("1") == 0)
+		{
+			log("Non-members aren't allowed on a members only site.");
+			return ""; // TO-DO: Return a 403.
+		}
+		if (currentUser.is_banned) return tmpls->render("banned");
+
+		int tid = 0;
+		try { tid = boost::lexical_cast<int>(path); }
+		catch (const boost::bad_lexical_cast &) { tid = 0; }
+
+		sql::ResultSet * res;
+		getTopicStmt->setInt(1, tid);
+		res = getTopicStmt->executeQuery();
+		//log("Fetching the topic..");
+		if (res->rowsCount() == 0)
+		{
+			log("The topic doesn't exist!");
+			outgoing.http_return = 404;
+			outgoing.http_return_status = "File Not Found";
+			return "";  // TO-DO: Return a 404.
+		}
+
+		// Get the table row..
+		res->next();
+		Topic mainTopic(res);
+		tmpls->assignVar("tid", std::to_string(mainTopic.getID()));
+		tmpls->assignVar("topic_name", mainTopic.getName());
+		Forum parentForum(res, false);
+		delete res;
+
+		std::string postList;
+		res = mainTopic.getPosts();
+		while (res->next())
+		{
+			tmpls->assignVar("content", res->getString("content"));
+			
+			User postAuthor(res->getInt("author"));
+			tmpls->assignVar("username", postAuthor.getName());
+
+			postList += tmpls->render("post");
+		}
+		delete res;
+		tmpls->assignVar("postList", postList);
+		tmpls->assignVar("body", tmpls->render("topic"));
+
+		log("Pushing the page..");
+		tmpls->assignVar("header", tmpls->render("header"));
+		tmpls->assignVar("footer", tmpls->render("footer"));
+		return tmpls->render("page");
+	});
+	addRoute("forums", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		log("Entering forum '" + path + "'");
+		User currentUser = checkSession(incoming);
+		if (!currentUser.loggedIn() && settings["members_only"].compare("1") == 0)
+		{
+			log("Non-members aren't allowed on a members only site.");
+			return ""; // TO-DO: Return a 403.
+		}
+		if (currentUser.is_banned) return tmpls->render("banned");
+
+		int fid = 0;
+		try { fid = boost::lexical_cast<int>(path); }
+		catch (const boost::bad_lexical_cast &) { fid = 0; }
+
+		log("Fetching the forum..");
+
+		// Luckily, we can just fetch the forum data from memory instead of having to waste a query..
+		Forum forum;
+		try
+		{
+			forum = forums[fid];
+		}
+		catch (...)
+		{
+			log("The forum doesn't exist!");
+			outgoing.http_return = 404;
+			outgoing.http_return_status = "File Not Found";
+			return ""; // TO-DO: Return a 404.
+		}
+
+		// Assign the forum data to the templates..
+		// TO-DO: Map the forum data to the templates when the forum server is initialized..
+		tmpls->assignVar("fid", std::to_string(forum.getID()));
+		tmpls->assignVar("forum_name", forum.getName());
+
+		std::string topicList;
+		sql::ResultSet * res;
+		res = forum.getTopics();
+		while (res->next())
+		{
+			tmpls->assignVar("content", res->getString("content"));
+
+			User postAuthor(res->getInt("author"));
+			tmpls->assignVar("username", postAuthor.getName());
+
+			topicList += tmpls->render("topic_row");
+		}
+		delete res;
+		tmpls->assignVar("topicList", topicList);
+		tmpls->assignVar("body", tmpls->render("topic"));
+
+		log("Pushing the page..");
+		tmpls->assignVar("header", tmpls->render("header"));
+		tmpls->assignVar("footer", tmpls->render("footer"));
+		return tmpls->render("page");
+	});
+	addRoute("create", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		User currentUser = checkSession(incoming);
+		// TO-DO: Add the ability to restrict posting to members only.
+		/*if (!currentUser.loggedIn() && settings["members_only"].compare("1") == 0)
+		{
+			return ""; // TO-DO: Return a 403.
+		}*/
+		if (currentUser.is_banned) return tmpls->render("banned");
+
+		if (path.compare("topic") == 0)
+		{
+			// TO-DO: The ability to create topics..
+			return "";
+		}
+		else if (path.compare("post") == 0)
+		{
+			int tid = 0;
+			std::string content;
+
+			// TO-DO: Use a less restrictive filtering method, since this one doesn't accept ANY symbols..
+			//log("Parsing the incoming form data..");
+			std::map<std::string,std::string> items = parseQueryString(incoming.body);
+
+			// Convert this to an integer.. Keep in mind, that this might not be a real integer, so set to 0 when the end-user is being stupid..
+			//log("Converting the TID..");
+			try { tid = boost::lexical_cast<int>(items["tid"]); }
+			catch (const boost::bad_lexical_cast &) { tid = 0; }
+
+			//log("Passing the content..");
+			try { content = items["content"]; }
+			catch (...) { log("No content!"); return ""; }
+			// TO-DO: Cleanup the sanitisation logic. Ignore the below legacy code. We might be able to use it somewhere else.
+			/*try
+			{
+				content.reserve(items["content"].length());
+				std::remove_copy_if(items["content"].begin(), items["content"].end(), std::back_inserter(content), std::not1(std::ptr_fun(isalnum)));
+			}
+			catch (std::exception& e)
+			{
+				//log(e.what());
+				return "Invalid content.";
+			}*/
+
+			//log("Firing off the insert query!");
+			try
+			{
+				createReplyStmt->setString(1, content);
+				createReplyStmt->setInt(2, 0); // Author
+				createReplyStmt->setInt(3, tid);
+				createReplyStmt->execute();
+			}
+			catch (std::exception& e)
+			{
+				log(e.what());
+				return "Invalid content.";
+			}
+
+			outgoing.http_return = 302;
+			outgoing.http_return_status = "Found";
+			outgoing.headers["Location"] = settings["site_url"] + "/topics/" + std::to_string(tid);
+			return "Redirecting..";
+		}
+
+		outgoing.http_return = 404;
+		outgoing.http_return_status = "File Not Found";
+		return ""; // TO-DO: Push a 404 error..
+		//log("Pushing the page..");
+		//tmpls->assignVar("header", tmpls->render("header"));
+		//tmpls->assignVar("footer", tmpls->render("footer"));
+		//return tmpls->render("page");
+	});
+	addRoute("login", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		User currentUser = checkSession(incoming);
+		if (currentUser.loggedIn())
+		{
+			log("You can't login when you're already logged in..");
+			return ""; // TO-DO: Return a 403.
+		}
+		if (currentUser.is_banned) return tmpls->render("banned");
+
+		// TO-DO: The Login System.
+
+		log("Pushing the page..");
+		tmpls->assignVar("header", tmpls->render("header"));
+		tmpls->assignVar("footer", tmpls->render("footer"));
+		return tmpls->render("page");
+	});
+
+	/* The Static Routes */
+	addRoute("js", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		// Try to avoid dangerous characters being introduced with minimal performance issues..
+		path = sanitisePathStrict(path);
+		//if (!validatePathStrict(path)) return "";  // TO-DO: Return a 500 or whatever the bad request code was.
+		
+		std::string data;
+		std::ifstream in("../js/" + path + ".js", std::ios::in | std::ios::binary);
+		if (in)
+		{
+			in.seekg(0, std::ios::end);
+			data.resize(in.tellg());
+			in.seekg(0, std::ios::beg);
+			in.read(&data[0], data.size());
+			in.close();
+			return data;
+		}
+		outgoing.http_return = 404;
+		outgoing.http_return_status = "File Not Found";
+		return ""; // TO-DO: Return a custom 404..
+	});
+	addRoute("css", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		// Try to avoid dangerous characters being introduced with minimal performance issues..
+		path = sanitisePathStrict(path);
+		//if (!validatePathStrict(path)) return "";  // TO-DO: Return a 500 or whatever the bad request code was.
+
+		outgoing.headers["Content-Type"] = "text/css";
+		std::ifstream in("../css/" + path + ".css", std::ios::in | std::ios::binary);
+		if (in)
+		{
+			//log("The CSS file exists!");
+			std::string data;
+			in.seekg(0, std::ios::end);
+			data.resize(in.tellg());
+			in.seekg(0, std::ios::beg);
+			in.read(&data[0], data.size());
+			in.close();
+			return data;
+		}
+		outgoing.http_return = 404;
+		outgoing.http_return_status = "File Not Found";
+		return ""; // TO-DO: Return a custom 404..
+	});
+	addRoute("images", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
+		//log("Pushing an image file..");
+		path = sanitisePathLoose(path);
+		log(path);
+
+		//outgoing.headers["Content-Type"] = "text/css";
+		//log("Valid image path!");
+		std::ifstream in("../images/" + path, std::ios::in | std::ios::binary);
+		if (in)
+		{
+			//log("The image file exists!");
+			std::string data;
+			in.seekg(0, std::ios::end);
+			data.resize(in.tellg());
+			in.seekg(0, std::ios::beg);
+			in.read(&data[0], data.size());
+			in.close();
+			return data;
+		}
+		
+		outgoing.http_return = 404;
+		outgoing.http_return_status = "File Not Found";
+		return ""; // TO-DO: Return a custom 404..
 	});
 
 	log("Initializing the forum server..");

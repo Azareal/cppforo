@@ -1,7 +1,14 @@
+/*
+Copyright (c) Azareal 2014.
+Licensed under the LGPL v3.
+*/
+
 #include <map>
 #include <string>;
-//#include <regex>;
 #include <fstream>;
+
+// The standard library currently doesn't support callbacks for the Regexes, so we have to use Boost's Regex System instead..
+//#include <regex>;
 #include <boost/regex.hpp>
 
 //#include <mysql_driver.h>
@@ -19,7 +26,7 @@ public:
 	//TemplateNode * childNode = nullptr;
 	std::map<std::string, TemplateNode*> childNodes;
 	std::string body;
-
+	
 	TemplateNode(std::string name, TemplateNode * node);
 	TemplateNode(std::string * data);
 	TemplateNode(char * data);
@@ -29,11 +36,9 @@ class Templates
 {
 	std::map<std::string, std::string> templateSet;
 	std::map<std::string, TemplateNode*> tmplmap;
-	//sql::Connection * con;
 	ForoDatabase * db;
 	sql::PreparedStatement * tmplStatement;
 public:
-	//Templates(sql::Connection * _con);
 	Templates(ForoDatabase * _db);
 	bool loadTemplate(std::string name);
 	std::string getTemplate(std::string name);

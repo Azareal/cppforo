@@ -15,6 +15,7 @@
 #include <tchar.h>
 #endif
 
+#include <typeinfo>
 #include "logger.h"
 
 // TODO: reference additional headers your program requires here

@@ -1,0 +1,16 @@
+<table>
+	<tr><td class="thead" colspan=2>{$topic_name}</td></tr>
+	{$postList}
+</table>
+<form action="//{$site_url}/create/post" method="post">
+	<input name="tid" value="{$tid}" type="hidden" />
+	<table>
+		<tr><td class="thead" colspan=2>New Reply</td></tr>
+		<tr><td class="tbody">
+			<textarea name="content" style="width: 100%;"></textarea>
+		</td></tr>
+		<tr><td class="tbody">
+			<input name="createReply" value="Create Reply" type="submit" />
+		</td></tr>
+	</table>
+</form>
