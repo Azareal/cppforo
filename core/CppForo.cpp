@@ -62,6 +62,7 @@ class forum_server : public dlib::server_http
 		log("Received new request from '" + incoming.foreign_ip + "' who is trying to access '" + path + "'");
 		std::string route;
 
+		// Is this conditional really needed..?
 		if (path.size() != 1)
 		{
 			std::string::iterator it;
@@ -69,16 +70,22 @@ class forum_server : public dlib::server_http
 			{
 				if (*it == '/') break;
 			}
-			int index = std::distance(path.begin() + 1, it);
-			try{
-				//out << routes[path.substr(1, index)](path.substr(index + 2), incoming, outgoing);
-				return routes[path.substr(1, index)](path.substr(index + 2), incoming, outgoing);
-			}
-			catch (std::exception& e)
+			
+			if (it != path.end())
 			{
-				error(e.what());
-				return "500 Internal Server Error";
+				try
+				{
+					int index = std::distance(path.begin() + 1, it);
+					//out << routes[path.substr(1, index)](path.substr(index + 2), incoming, outgoing);
+					return routes[path.substr(1, index)](path.substr(index + 2), incoming, outgoing);
+				}
+				catch (std::exception& e)
+				{
+					error(e.what());
+					return "500 Internal Server Error";
+				}
 			}
+			else return routes["home"](path.substr(1), incoming, outgoing);
 		}
 		// Home is the default route..
 		else return routes["home"]("",incoming, outgoing);
@@ -112,12 +119,15 @@ void loadSettings()
 sql::PreparedStatement * getSessionStmt;
 sql::PreparedStatement * getTopicStmt;
 sql::PreparedStatement * createReplyStmt;
+sql::PreparedStatement * createTopicStmt;
+sql::PreparedStatement * getInsertId;
 
 User checkSession(dlib::incoming_things& incoming)
 {
 	int uid = 0;
 	std::string session = "";
 
+	// TO-DO: Use a lexical cast for this..
 	try{
 		uid = std::stoi(incoming.cookies["uid"]);
 		session = incoming.cookies["session"];
@@ -256,6 +266,10 @@ int main(int argc, char * argv[])
 		getSessionStmt = db->con->prepareStatement("SELECT * FROM " + db->prefix + "users WHERE session = ? LIMIT 1");
 		getTopicStmt = db->con->prepareStatement("SELECT * FROM " + db->prefix + "topics AS topics LEFT JOIN " + db->prefix + "forums AS forums ON topics.fid=forums.fid WHERE tid = ? LIMIT 1");
 		createReplyStmt = db->con->prepareStatement("INSERT INTO " + db->prefix + "posts (content, author, tid) VALUES (?, ?, ?)");
+		createTopicStmt = db->con->prepareStatement("INSERT INTO " + db->prefix + "topics (topic_name, author, fid) VALUES (?, ?, ?)");
+		
+		// Unfortunately, the C++ API doesn't see to cover this for me.. sooooooo....
+		getInsertId = db->con->prepareStatement("SELECT LAST_INSERT_ID() AS last_id;");
 	}
 	catch (std::exception& e)
 	{
@@ -274,6 +288,9 @@ int main(int argc, char * argv[])
 	if (!tmpls->loadTemplate("category")) { error("Failed to load the category template.."); return 1; }
 	if (!tmpls->loadTemplate("forum_row")) { error("Failed to load the forum_row template.."); return 1; }
 
+	if (!tmpls->loadTemplate("forum")) { error("Failed to load the forum template.."); return 1; }
+	if (!tmpls->loadTemplate("topic_row")) { error("Failed to load the topic_row template.."); return 1; }
+
 	if (!tmpls->loadTemplate("topic")) { error("Failed to load the topic template.."); return 1; }
 	if (!tmpls->loadTemplate("post")) { error("Failed to load the post template.."); return 1; }
 
@@ -284,6 +301,14 @@ int main(int argc, char * argv[])
 	log("Registering the routes..");
 	addRoute("home", [](std::string path, dlib::incoming_things incoming, dlib::outgoing_things& outgoing)->std::string{
 		User currentUser = checkSession(incoming);
+
+		// Is the browser looking for the favicon..?
+		if (path.compare("favicon.ico") == 0)
+		{
+			outgoing.http_return = 404;
+			outgoing.http_return_status = "File Not Found";
+			return "";
+		}
 
 		//tmpls->assignVar("helloworld", "Hello World");
 		if (!currentUser.loggedIn() && settings["members_only"].compare("1")==0)
@@ -405,10 +430,7 @@ int main(int argc, char * argv[])
 
 		// Luckily, we can just fetch the forum data from memory instead of having to waste a query..
 		Forum forum;
-		try
-		{
-			forum = forums[fid];
-		}
+		try { forum = forums[fid]; }
 		catch (...)
 		{
 			log("The forum doesn't exist!");
@@ -427,16 +449,19 @@ int main(int argc, char * argv[])
 		res = forum.getTopics();
 		while (res->next())
 		{
-			tmpls->assignVar("content", res->getString("content"));
+			tmpls->assignVar("tid", std::to_string(res->getInt("tid")));
+			tmpls->assignVar("topic_name", res->getString("topic_name"));
 
 			User postAuthor(res->getInt("author"));
-			tmpls->assignVar("username", postAuthor.getName());
+			tmpls->assignVar("author_name", postAuthor.getName());
+			// TO-DO: Store the lastposter data on a per-topic level..
+			tmpls->assignVar("lastposter_name", postAuthor.getName());
 
 			topicList += tmpls->render("topic_row");
 		}
 		delete res;
-		tmpls->assignVar("topicList", topicList);
-		tmpls->assignVar("body", tmpls->render("topic"));
+		tmpls->assignVar("topic_list", topicList);
+		tmpls->assignVar("body", tmpls->render("forum"));
 
 		log("Pushing the page..");
 		tmpls->assignVar("header", tmpls->render("header"));
@@ -454,8 +479,65 @@ int main(int argc, char * argv[])
 
 		if (path.compare("topic") == 0)
 		{
-			// TO-DO: The ability to create topics..
-			return "";
+			int fid = 0;
+			std::string name;
+			std::string content;
+
+			// TO-DO: Use a less restrictive filtering method, since this one doesn't accept ANY symbols..
+			//log("Parsing the incoming form data..");
+			std::map<std::string, std::string> items = parseQueryString(incoming.body);
+
+			// Convert this to an integer.. Keep in mind, that this might not be a real integer, so set to 0 when the end-user is being stupid..
+			log("Converting the FID..");
+			try { fid = boost::lexical_cast<int>(items["fid"]); }
+			catch (const boost::bad_lexical_cast &) { fid = 0; }
+
+			try { name = items["name"]; }
+			catch (...) { log("No title!"); return ""; }
+
+			try { content = items["content"]; }
+			catch (...) { log("No content!"); return ""; }
+
+			// We want to execute these queries in a single transaction..
+			sql::ResultSet * res;
+			db->con->setAutoCommit(0);
+
+			log("Firing off the insert queries!");
+			try
+			{
+				createTopicStmt->setString(1, name);
+				createTopicStmt->setInt(2, 0); // Author
+				createTopicStmt->setInt(3, fid);
+				//res = createTopicStmt->executeQuery();
+				createTopicStmt->execute();
+				
+				res = getInsertId->executeQuery();
+				res->next();
+				int tid = res->getInt("last_id");
+				delete res;
+
+				createReplyStmt->setString(1, content);
+				createReplyStmt->setInt(2, 0); // Author
+				createReplyStmt->setInt(3, tid);
+				createReplyStmt->execute();
+			}
+			catch (std::exception& e)
+			{
+				log(e.what());
+				db->con->rollback();
+				db->con->setAutoCommit(1);
+				return "Invalid content.";
+			}
+
+			// Release the database lock and switch auto-commit back on..
+			db->con->commit();
+			db->con->setAutoCommit(1);
+
+			outgoing.http_return = 302;
+			outgoing.http_return_status = "Found";
+			// TO-DO: Redirect to the topic which was created instead of it's parent forum..
+			outgoing.headers["Location"] = settings["site_url"] + "/forums/" + std::to_string(fid);
+			return "Redirecting..";
 		}
 		else if (path.compare("post") == 0)
 		{

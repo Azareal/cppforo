@@ -26,6 +26,7 @@ TemplateNode::TemplateNode(char * data)
 }
 
 //Templates::Templates(sql::Connection * _con)
+// TO-DO: Find some way to compile the templates to some sort of bytecode in order to speed up the process..
 Templates::Templates(ForoDatabase * _db)
 {
 	db = _db;

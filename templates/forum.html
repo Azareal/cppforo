@@ -1,0 +1,20 @@
+<form action="//{$site_url}/create/topic" method="post">
+	<input name="fid" value="{$fid}" type="hidden" />
+	<table>
+		<tr><td class="thead" colspan=2>New Topic</td></tr>
+		<tr>
+			<td class="tbody">Title:</td>
+			<td class="tbody"><input name="name" type="text" /></td>
+		</tr>
+		<tr><td class="tbody" colspan=2>
+			<textarea name="content" style="width: 100%;"></textarea>
+		</td></tr>
+		<tr><td class="tbody" colspan=2>
+			<input name="createTopic" value="Create Topic" type="submit" />
+		</td></tr>
+	</table>
+</form>
+<table>
+	<tr><td class="thead" colspan=2>{$forum_name}</td></tr>
+	{$topic_list}
+</table>
