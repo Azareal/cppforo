@@ -97,7 +97,7 @@ void Forum::prepare()
 	}
 	catch (std::exception& e)
 	{
-		error(e.what());
+		ferror(e.what());
 	}
 }
 

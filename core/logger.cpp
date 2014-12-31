@@ -17,7 +17,7 @@ void log(std::string str)
 	std::cout << str << std::endl;
 }*/
 
-void error(std::string str)
+void ferror(std::string str)
 {
 	std::cerr << str << std::endl;
 
@@ -27,7 +27,7 @@ void error(std::string str)
 	std::getline(std::cin, blargle);
 }
 
-void error(char * str)
+void ferror(char * str)
 {
 	std::cerr << std::string(str) << std::endl;
 

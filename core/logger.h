@@ -7,5 +7,5 @@ Licensed under the LGPL v3.
 #include <string>
 
 void log(std::string str);
-void error(std::string str);
-void error(char * str);
+void ferror(std::string str);
+void ferror(char * str);

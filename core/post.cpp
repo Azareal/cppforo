@@ -26,7 +26,7 @@ void Post::prepare()
 	}
 	catch (std::exception& e)
 	{
-		error(e.what());
+		ferror(e.what());
 	}
 }
 
