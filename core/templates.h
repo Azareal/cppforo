@@ -3,21 +3,13 @@ Copyright (c) Azareal 2014.
 Licensed under the LGPL v3.
 */
 
+#pragma once
 #include <map>
 #include <string>;
 #include <fstream>;
 
 // The standard library currently doesn't support callbacks for the Regexes, so we have to use Boost's Regex System instead..
-//#include <regex>;
 #include <boost/regex.hpp>
-
-//#include <mysql_driver.h>
-//#include <mysql_connection.h>
-//#include <mysql_error.h>
-//#include <cppconn/statement.h>
-//#include <cppconn/prepared_statement.h>
-//#include <cppconn/resultset.h>
-
 #include "database.h"
 
 class TemplateNode

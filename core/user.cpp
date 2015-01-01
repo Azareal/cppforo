@@ -99,3 +99,45 @@ User guest()
 	data.username = "Guest";
 	return data;
 }
+
+extern sql::PreparedStatement * getSessionStmt;
+User checkSession(pion::http::request_ptr& http_request_ptr)
+{
+	int uid = 0;
+	std::string session = "";
+
+	// TO-DO: Use a lexical cast for this..
+	try{
+		uid = std::stoi(http_request_ptr->get_cookie("uid"));
+		session = http_request_ptr->get_cookie("session");
+	}
+	catch (...) { return guest(); }
+
+	if (uid != 0 && session.compare("") != 0)
+	{
+		//log("The session isn't blank");
+		sql::ResultSet * res;
+		getSessionStmt->setString(1, session);
+		res = getSessionStmt->executeQuery();
+
+		if (res->rowsCount() == 0)
+		{
+			// TO-DO: Might have to add a more detailed logging level to avoid the admin console from being flooded..
+			//log("It's a guest!");
+			return guest();
+		}
+
+		User out;
+		out.uid = res->getInt("uid");
+		out.username = res->getString("username");
+		out.gid = res->getInt("gid");
+		out.is_admin = res->getBoolean("is_admin");
+		out.is_mod = res->getBoolean("is_mod");
+		out.is_banned = res->getBoolean("is_banned");
+
+		delete res;
+		return out;
+	}
+
+	return guest();
+}

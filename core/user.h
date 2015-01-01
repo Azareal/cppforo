@@ -3,8 +3,8 @@ Copyright (c) Azareal 2014.
 Licensed under the LGPL v3.
 */
 
+#pragma once
 #include <string>
-
 #include <mysql_driver.h>
 #include <mysql_connection.h>
 #include <mysql_error.h>
@@ -12,10 +12,7 @@ Licensed under the LGPL v3.
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
 #include <cppconn/prepared_statement.h>
-
-//#define ENABLE_ASSERTS
-//#include <dlib/all/source.cpp>
-//#include <dlib/server.h>
+#include <pion/http/request.hpp>
 
 #include "database.h"
 #include "exceptions.h"
@@ -48,3 +45,4 @@ public:
 };
 
 User guest();
+User checkSession(pion::http::request_ptr& http_request_ptr);
