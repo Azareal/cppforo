@@ -7,7 +7,9 @@ Licensed under the LGPL v3.
 #include <string>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
+#ifndef __linux
 #include <mysql_error.h>
+#endif
 #include <cppconn/exception.h>
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>

@@ -36,7 +36,7 @@ void forum_server::handle_request(http::request_ptr& http_request_ptr, tcp::conn
 		{
 			if (*it == '/') break;
 		}
-		
+
 		if (it != path.end())
 		{
 			try
@@ -100,7 +100,12 @@ int main(int argc, char * argv[])
 	log("Reading the configuration file..");
 	try
 	{
+		// The Visual Studio projects are nested a little differently..
+		#ifdef _WIN32
 		boost::property_tree::ini_parser::read_ini("../config.ini", pt);
+		#else
+		boost::property_tree::ini_parser::read_ini("./config.ini", pt);
+		#endif
 	}
 	catch (std::exception& e)
 	{
@@ -174,7 +179,7 @@ int main(int argc, char * argv[])
 		ferror("Exception: " + errmsg);
 		return 1;
 	}
-	
+
 	log("Moving the database handling into the database object..");
 	db = new ForoDatabase(con, pt.get<std::string>("mysql.prefix"));
 
@@ -190,7 +195,7 @@ int main(int argc, char * argv[])
 		getTopicStmt = db->con->prepareStatement("SELECT * FROM " + db->prefix + "topics AS topics LEFT JOIN " + db->prefix + "forums AS forums ON topics.fid=forums.fid WHERE tid = ? LIMIT 1");
 		createReplyStmt = db->con->prepareStatement("INSERT INTO " + db->prefix + "posts (content, author, tid) VALUES (?, ?, ?)");
 		createTopicStmt = db->con->prepareStatement("INSERT INTO " + db->prefix + "topics (topic_name, author, fid) VALUES (?, ?, ?)");
-		
+
 		// Unfortunately, the C++ API doesn't see to cover this for me.. sooooooo....
 		getInsertId = db->con->prepareStatement("SELECT LAST_INSERT_ID() AS last_id;");
 	}
@@ -232,7 +237,7 @@ int main(int argc, char * argv[])
 	try
 	{
 		//process::initialize();
-		
+
 		//forum_server  fserver = forum_server::server(atoi(port.c_str()));
 		//auto fserver = forum_server::server(atoi(port.c_str()));
 		//fserver.set_port(atoi(port.c_str()));

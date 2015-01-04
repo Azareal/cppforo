@@ -11,6 +11,8 @@
 #include <pion/http/request_reader.hpp>
 #include <pion/http/response_writer.hpp>
 
+#include <openssl/blowfish.h>
+
 #include "templates.h"
 #include "forum.h"
 #include "user.h"

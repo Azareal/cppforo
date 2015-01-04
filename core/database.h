@@ -5,7 +5,9 @@ Licensed under the LGPL v3.
 
 #include <mysql_driver.h>
 #include <mysql_connection.h>
+#ifndef __linux
 #include <mysql_error.h>
+#endif
 #pragma once
 
 class ForoDatabase

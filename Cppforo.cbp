@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="Cppforo" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/Cppforo" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-Winit-self" />
+					<Add option="-Wredundant-decls" />
+					<Add option="-Wfloat-equal" />
+					<Add option="-Winline" />
+					<Add option="-Wunreachable-code" />
+					<Add option="-Wmissing-declarations" />
+					<Add option="-Wmissing-include-dirs" />
+					<Add option="-Wmain" />
+					<Add option="-Wzero-as-null-pointer-constant" />
+					<Add option="-std=c++11" />
+					<Add option="-Wfatal-errors" />
+					<Add option="-Wextra" />
+					<Add option="-g" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/Cppforo" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O3" />
+					<Add option="-Winit-self" />
+					<Add option="-Winline" />
+					<Add option="-Wunreachable-code" />
+					<Add option="-Wmissing-include-dirs" />
+					<Add option="-Wzero-as-null-pointer-constant" />
+					<Add option="-std=c++11" />
+					<Add option="-Wfatal-errors" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+			<Add directory="/usr/include/python3.4m" />
+			<Add directory="/usr/include" />
+			<Add directory="/usr/local/include" />
+		</Compiler>
+		<Linker>
+			<Add library="python3.4m" />
+			<Add library="mysqlcppconn" />
+			<Add library="pion" />
+			<Add library="boost_thread" />
+			<Add library="boost_regex" />
+			<Add library="boost_system" />
+			<Add library="ssl" />
+			<Add library="crypto" />
+			<Add library="crypto++" />
+			<Add directory="/usr/lib/python3.4" />
+			<Add directory="/usr/lib" />
+			<Add directory="/usr/lib/i386-linux-gnu" />
+		</Linker>
+		<Unit filename="core/CppForo.cpp" />
+		<Unit filename="core/Cppforo.h" />
+		<Unit filename="core/database.cpp" />
+		<Unit filename="core/database.h" />
+		<Unit filename="core/exceptions.cpp" />
+		<Unit filename="core/exceptions.h" />
+		<Unit filename="core/forum.cpp" />
+		<Unit filename="core/forum.h" />
+		<Unit filename="core/group.h" />
+		<Unit filename="core/logger.cpp" />
+		<Unit filename="core/logger.h" />
+		<Unit filename="core/parse.cpp" />
+		<Unit filename="core/parse.h" />
+		<Unit filename="core/post.cpp" />
+		<Unit filename="core/post.h" />
+		<Unit filename="core/routes.cpp" />
+		<Unit filename="core/routes.h" />
+		<Unit filename="core/stdafx.cpp" />
+		<Unit filename="core/stdafx.h" />
+		<Unit filename="core/targetver.h" />
+		<Unit filename="core/templates.cpp" />
+		<Unit filename="core/templates.h" />
+		<Unit filename="core/topic.cpp" />
+		<Unit filename="core/topic.h" />
+		<Unit filename="core/user.cpp" />
+		<Unit filename="core/user.h" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

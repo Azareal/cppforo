@@ -5,7 +5,9 @@ Licensed under the LGPL v3.
 
 #include <mysql_driver.h>
 #include <mysql_connection.h>
+#ifndef __linux
 #include <mysql_error.h>
+#endif
 #include <cppconn/exception.h>
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
@@ -28,7 +30,7 @@ public:
 	Topic();
 	Topic(int _tid);
 	Topic(sql::ResultSet * res);
-	static void Topic::prepare();
+	static void prepare();
 
 	int getID();
 

@@ -6,7 +6,9 @@
 #include <string>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
+#ifndef __linux
 #include <mysql_error.h>
+#endif
 #include <cppconn/exception.h>
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
@@ -21,7 +23,7 @@ class Post
 {
 	//static sql::PreparedStatement * getStatement;
 	//static sql::PreparedStatement * updateStatement;
-	
+
 	int pid;
 	int tid;
 	std::string content;
@@ -41,8 +43,8 @@ public:
 	int getAuthor();
 	bool setAuthor(int _author);
 	bool is(std::string name);
-	bool Post::lock(bool state);
-	bool Post::stick(bool state);
+	bool lock(bool state);
+	bool stick(bool state);
 
 	Topic getParentTopic();
 };
